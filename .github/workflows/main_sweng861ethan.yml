@@ -23,17 +23,36 @@ jobs:
         with:
           node-version: '22.x'
 
-      - name: npm install, build, and test
-        run: |
-          npm install
-          npm run build --if-present
-          npm run test --if-present
+      # ---- Build frontend (Vite) ----
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      # ---- Install backend deps & generate Prisma ----
+      - name: Install backend deps
+        working-directory: backend
+        run: npm ci
+
+      - name: Prisma generate
+        working-directory: backend
+        run: npx prisma generate
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
           path: .
+
+      # ---- Copy built frontend into backend/public ----
+      - name: Copy frontend build into backend
+        run: |
+          rm -rf backend/public
+          mkdir -p backend/public
+          cp -r frontend/dist/* backend/public
 
   deploy:
     runs-on: ubuntu-latest
@@ -62,4 +81,5 @@ jobs:
           app-name: 'sweng861ethan'
           slot-name: 'Production'
           package: .
+
           
