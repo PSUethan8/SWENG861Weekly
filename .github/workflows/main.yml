@@ -1,0 +1,56 @@
+name: Deploy Fullstack to Azure Web App
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      # ---- Build frontend (Vite) ----
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      # ---- Install backend deps & generate Prisma ----
+      - name: Install backend deps
+        working-directory: backend
+        run: npm ci
+
+      - name: Prisma generate
+        working-directory: backend
+        run: npx prisma generate
+
+      # ---- Copy built frontend into backend/public ----
+      - name: Copy frontend build into backend
+        run: |
+          rm -rf backend/public
+          mkdir -p backend/public
+          cp -r frontend/dist/* backend/public/
+
+      # ---- Zip and deploy the backend folder only ----
+      - name: Archive production artifact
+        run: |
+          cd backend
+          zip -r ../release.zip .
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: sweng861ethan                   # e.g., my-login-service
+          slot-name: 'production'
+          package: release.zip
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
