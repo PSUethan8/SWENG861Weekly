@@ -3,7 +3,8 @@ import axios from 'axios';
 import './App.css';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_BACKEND_URL,
+  //baseURL: import.meta.env.VITE_BACKEND_URL,
+  baseURL: '',
   withCredentials: true,
 });
 

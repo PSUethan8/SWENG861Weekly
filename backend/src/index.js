@@ -2,28 +2,33 @@ import 'dotenv/config';
 import express from 'express';
 import session from 'express-session';
 import SQLiteStoreFactory from 'connect-sqlite3';
-import cors from 'cors';
 import passport from 'passport';
 import morgan from 'morgan';
-import bcrypt from 'bcryptjs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 import './passport.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const prisma = new PrismaClient();
 const SQLiteStore = SQLiteStoreFactory(session);
 
 const {
-  PORT = 4000,
-  CLIENT_URL,
-  SESSION_SECRET
+  PORT = process.env.PORT || 4000,
+  SESSION_SECRET,
+  NODE_ENV = 'development',
 } = process.env;
 
-app.use(morgan('dev'));
+const prod = NODE_ENV === 'production';
+
+app.use(morgan(prod ? 'combined' : 'dev'));
 app.use(express.json());
 
-app.use(cors({ origin: CLIENT_URL, credentials: true }));
-
+// Same-origin deployment => no CORS needed
 app.set('trust proxy', 1);
 
 app.use(session({
@@ -33,8 +38,8 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    sameSite: 'lax', // in prod across domains: 'none' + secure:true
-    secure: false
+    sameSite: 'lax',     // same-origin is fine
+    secure: prod,        // true on Azure (HTTPS)
   }
 }));
 
@@ -59,6 +64,7 @@ app.post('/auth/local/register', async (req, res) => {
   try {
     const { email, password, name } = req.body ?? {};
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+
     const normalized = String(email).toLowerCase().trim();
     if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
 
@@ -87,24 +93,46 @@ app.post('/auth/local/register', async (req, res) => {
   }
 });
 
-/* -------- Local: Login -------- */
-app.post('/auth/local/login',
-  passport.authenticate('local'),
-  (req, res) => {
-    res.json({ user: req.user });
-  }
-);
+/* -------- Local: Login (custom callback for clean 401s) -------- */
+app.post('/auth/local/login', (req, res, next) => {
+  passport.authenticate('local', (err, user, info) => {
+    if (err) {
+      console.error('Login error:', err);
+      return res.status(500).json({ error: 'Internal authentication error' });
+    }
+    if (!user) {
+      return res.status(401).json({ error: info?.message || 'Invalid credentials' });
+    }
+    req.logIn(user, (err2) => {
+      if (err2) {
+        console.error('req.logIn error:', err2);
+        return res.status(500).json({ error: 'Session creation failed' });
+      }
+      return res.json({ user });
+    });
+  })(req, res, next);
+});
 
-/* -------- Google (unchanged) -------- */
+/* -------- Google (same-origin redirects) -------- */
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 app.get('/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: `${CLIENT_URL}/login?error=google` }),
-  (_req, res) => res.redirect(`${CLIENT_URL}/`)
+  passport.authenticate('google', { failureRedirect: '/login?error=google' }),
+  (_req, res) => res.redirect('/')
 );
 
+/* -------- Error handler -------- */
 app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(500).json({ error: 'Internal error' });
 });
 
-app.listen(PORT, () => console.log(`Backend on ${PORT}`));
+/* --------- Static serving (React build) ---------- */
+const clientDist = path.join(__dirname, '..', '..', 'frontend', 'dist');
+app.use(express.static(clientDist));
+
+// SPA fallback: send index.html for any non-API/auth GET route
+app.get(/^(?!\/api|\/auth).*/, (req, res) => {
+  res.sendFile(path.join(clientDist, 'index.html'));
+});
+
+app.listen(PORT, () => console.log(`Server listening on ${PORT}`));
