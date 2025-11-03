@@ -39,6 +39,8 @@ jobs:
 
       - name: Prisma generate
         working-directory: backend
+        env:
+          DATABASE_URL: file:./dev.db
         run: npx prisma generate
 
       - name: Upload artifact for deployment job
@@ -83,3 +85,4 @@ jobs:
           package: .
 
           
+
