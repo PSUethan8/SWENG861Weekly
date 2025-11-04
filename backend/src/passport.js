@@ -4,7 +4,6 @@ import { Strategy as LocalStrategy } from 'passport-local';
 import bcrypt from 'bcryptjs';
 import prismaPkg from '@prisma/client';
 const { PrismaClient } = prismaPkg;
-//import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
