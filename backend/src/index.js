@@ -144,9 +144,4 @@ if (fs.existsSync(path.join(clientDist, 'index.html'))) {
   console.warn('⚠️ No frontend build found in', clientDist);
 }
 
-// SPA fallback: send index.html for any non-API/auth GET route
-app.get(/^(?!\/api|\/auth).*/, (req, res) => {
-  res.sendFile(path.join(clientDist, 'index.html'));
-});
-
 app.listen(PORT, () => console.log(`Server listening on ${PORT}`));

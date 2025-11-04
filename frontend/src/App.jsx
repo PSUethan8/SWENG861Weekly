@@ -60,7 +60,7 @@ export default function App() {
   };
 
   const loginGoogle = () => {
-    window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/google`;
+    window.location.href = '/auth/google';
   };
 
   if (loading) {
