@@ -12,14 +12,19 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x' # LTS recommended for Azure/Prisma
+          node-version: '20.x'     # LTS recommended for Prisma/Azure
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
 
-      # ---- Build frontend (Vite) ----
+      # ---------- Frontend (Vite) ----------
       - name: Install frontend deps
         working-directory: frontend
         run: npm ci
@@ -28,34 +33,35 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      # ---- Install backend deps & Prisma generate ----
+      # ---------- Backend (Express/Prisma) ----------
       - name: Install backend deps
         working-directory: backend
+        # CI needs DATABASE_URL for "prisma generate"
         env:
           DATABASE_URL: file:./dev.db
         run: npm ci
 
-      - name: Prisma generate
+      - name: Prisma generate (CI)
         working-directory: backend
         env:
           DATABASE_URL: file:./dev.db
         run: npx prisma generate
 
-      # ---- Copy built frontend into backend/public (before upload!) ----
-      - name: Copy frontend build into backend
+      # ---------- Copy built frontend into backend/public ----------
+      - name: Copy frontend build into backend/public
         run: |
           rm -rf backend/public
           mkdir -p backend/public
           cp -r frontend/dist/* backend/public/
 
-      # (Optional) If you want to run migrations at build time
-      # - name: Prisma migrate deploy
+      # If you want to run migrations during CI build, uncomment:
+      # - name: Prisma migrate deploy (CI)
       #   working-directory: backend
       #   env:
       #     DATABASE_URL: file:./dev.db
       #   run: npx prisma migrate deploy
 
-      # ---- Upload ONLY the backend as the deploy artifact ----
+      # ---------- Upload ONLY the backend as artifact ----------
       - name: Upload backend artifact
         uses: actions/upload-artifact@v4
         with:
@@ -76,7 +82,7 @@ jobs:
           name: backend-for-deploy
           path: backend
 
-      - name: Login to Azure
+      - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_E03E7B72228F417287200DD5A15838C4 }}
@@ -88,4 +94,4 @@ jobs:
         with:
           app-name: sweng861ethan
           slot-name: Production
-          package: backend   # deploy ONLY backend directory
+          package: backend      # deploy ONLY backend directory
