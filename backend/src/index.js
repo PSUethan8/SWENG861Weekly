@@ -6,7 +6,9 @@ import passport from 'passport';
 import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { PrismaClient } from '@prisma/client';
+import prismaPkg from '@prisma/client';
+const { PrismaClient } = prismaPkg;
+//import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import './passport.js';
 
@@ -127,8 +129,19 @@ app.use((err, _req, res, _next) => {
 });
 
 /* --------- Static serving (React build) ---------- */
-const clientDist = path.join(__dirname, '..', '..', 'frontend', 'dist');
-app.use(express.static(clientDist));
+// Serve from backend/public
+const clientDist = path.join(__dirname, '..', 'public');
+console.log('Static path:', clientDist, 'exists:', fs.existsSync(path.join(clientDist, 'index.html')));
+
+if (fs.existsSync(path.join(clientDist, 'index.html'))) {
+  app.use(express.static(clientDist));
+  // Express 5 compatible SPA fallback (no "*")
+  app.get(/^(?!\/api|\/auth).*/, (req, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+} else {
+  console.warn('⚠️ No frontend build found in', clientDist);
+}
 
 // SPA fallback: send index.html for any non-API/auth GET route
 app.get(/^(?!\/api|\/auth).*/, (req, res) => {
