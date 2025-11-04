@@ -31,6 +31,8 @@ jobs:
       # ---- Install backend deps & Prisma generate ----
       - name: Install backend deps
         working-directory: backend
+        env:
+          DATABASE_URL: file:./dev.db
         run: npm ci
 
       - name: Prisma generate
