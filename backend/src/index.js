@@ -35,7 +35,8 @@ app.use(express.json());
 app.set('trust proxy', 1);
 
 app.use(session({
-  store: new SQLiteStore({db: 'sessions.sqlite', dir: process.env.SESSION_DIR || '/home/site/data' }),
+  store: new SQLiteStore({ db: 'sessions.sqlite', dir: './' }),
+  //store: new SQLiteStore({db: 'sessions.sqlite', dir: process.env.SESSION_DIR || '/home/site/data' }),
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
