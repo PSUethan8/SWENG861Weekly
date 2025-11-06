@@ -47,13 +47,6 @@ jobs:
           DATABASE_URL: file:./dev.db
         run: npx prisma generate
 
-      # ---------- Copy built frontend into backend/public ----------
-      - name: Copy frontend build into backend/public
-        run: |
-          rm -rf backend/public
-          mkdir -p backend/public
-          cp -r frontend/dist/* backend/public/
-
       # If you want to run migrations during CI build, uncomment:
       # - name: Prisma migrate deploy (CI)
       #   working-directory: backend
