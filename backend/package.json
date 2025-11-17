@@ -12,18 +12,22 @@
   "license": "ISC",
   "dependencies": {
     "@prisma/client": "^6.18.0",
+    "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
     "connect-sqlite3": "^0.9.16",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "express-session": "^1.18.2",
+    "joi": "^18.0.1",
+    "mongoose": "^8.19.3",
     "morgan": "^1.10.1",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "passport-linkedin-oauth2": "^2.0.0",
     "passport-local": "^1.0.0",
-    "prisma": "^6.18.0"
+    "prisma": "^6.18.0",
+    "swagger-ui-express": "^5.0.1"
   },
   "type": "module"
 }

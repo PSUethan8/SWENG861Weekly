@@ -12,6 +12,10 @@ const { PrismaClient } = prismaPkg;
 //import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import './passport.js';
+import mongoose from 'mongoose';
+import bookRoutes from './books/bookRoutes.js';
+import { importBooksFromOpenLibrary } from './books/importBooks.js';
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,9 +28,21 @@ const {
   PORT = process.env.PORT || 4000,
   SESSION_SECRET,
   NODE_ENV = 'development',
+  MONGODB_URI,
+  FRONTEND_BASE_URL,
 } = process.env;
 
 const prod = NODE_ENV === 'production';
+
+const mongoUri = MONGODB_URI || 'mongodb://localhost:27017/bookapi';
+mongoose
+  .connect(mongoUri)
+  .then(() => {
+    console.log('✅ Connected to MongoDB:', mongoUri);
+  })
+  .catch((err) => {
+    console.error('❌ MongoDB connection error:', err);
+  });
 
 app.use(morgan(prod ? 'combined' : 'dev'));
 app.use(express.json());
@@ -49,6 +65,13 @@ app.use(session({
 
 app.use(passport.initialize());
 app.use(passport.session());
+
+function requireAuth(req, res, next) {
+  if (req.isAuthenticated && req.isAuthenticated()) {
+    return next();
+  }
+  return res.status(401).json({ error: 'Unauthorized' });
+}
 
 /* -------- Health & Me -------- */
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
@@ -119,10 +142,31 @@ app.post('/auth/local/login', (req, res, next) => {
 
 /* -------- Google (same-origin redirects) -------- */
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-app.get('/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login?error=google' }),
-  (_req, res) => res.redirect('/')
+app.get(
+  '/auth/google/callback',
+  passport.authenticate('google', {
+    failureRedirect: `${FRONTEND_BASE_URL}/?error=google`,
+  }),
+  (_req, res) => {
+    // On success, send them back to the frontend app
+    res.redirect(FRONTEND_BASE_URL);
+  }
 );
+/* -------- Books API (protected) -------- */
+// CRUD routes - only for logged-in users
+app.use('/api/books', requireAuth, bookRoutes);
+
+// Optional: import from Open Library (body: { query?: string })
+app.post('/api/books/import', requireAuth, async (req, res, next) => {
+  try {
+    const { query } = req.body ?? {};
+    const imported = await importBooksFromOpenLibrary(query || 'javascript');
+    res.status(201).json({ imported });
+  } catch (err) {
+    next(err);
+  }
+});
+
 
 /* -------- Error handler -------- */
 app.use((err, _req, res, _next) => {
