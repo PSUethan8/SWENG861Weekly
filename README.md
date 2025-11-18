@@ -1,4 +1,3 @@
-````markdown
 # Social Login + Books API
 
 This project is a full-stack app that combines:
@@ -12,8 +11,6 @@ This project is a full-stack app that combines:
 ---
 
 ## High-Level Structure
-
-```text
 frontend/
   package.json
   vite.config.js
@@ -33,9 +30,6 @@ backend/
       openLibraryService.js
       validation.js
       importBooks.js
-````
-
----
 
 ## Frontend
 
@@ -427,6 +421,4 @@ Used by the protected route `POST /api/books/import` to seed/populate your books
    * A button in `BooksPage` calls `/api/books/import`.
    * Backend fetches from Open Library, validates, and upserts books into Mongo.
 
-```
-::contentReference[oaicite:0]{index=0}
-```
+
