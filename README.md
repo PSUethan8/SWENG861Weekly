@@ -427,7 +427,6 @@ Used by the protected route `POST /api/books/import` to seed/populate your books
    * A button in `BooksPage` calls `/api/books/import`.
    * Backend fetches from Open Library, validates, and upserts books into Mongo.
 
-
 ```
 ::contentReference[oaicite:0]{index=0}
 ```
