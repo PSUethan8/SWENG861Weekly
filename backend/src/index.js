@@ -157,10 +157,12 @@ app.get(
 app.use('/api/books', requireAuth, bookRoutes);
 
 // Optional: import from Open Library (body: { query?: string })
+// Imports books into the current user's personal list
 app.post('/api/books/import', requireAuth, async (req, res, next) => {
   try {
     const { query } = req.body ?? {};
-    const imported = await importBooksFromOpenLibrary(query || 'javascript');
+    const userId = req.user.id;
+    const imported = await importBooksFromOpenLibrary(query || 'javascript', userId);
     res.status(201).json({ imported });
   } catch (err) {
     next(err);

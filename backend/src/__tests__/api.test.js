@@ -431,6 +431,189 @@ describe('Books API', () => {
     expect(res.status).toBe(201);
     expect(res.body.title).toBe(longTitle);
   });
+
+  // Test Case 25b: User isolation - users cannot see each other's books
+  test('Users should only see their own books', async () => {
+    // Create two separate users
+    const agent1 = await createAuthenticatedAgent();
+    const agent2 = await createAuthenticatedAgent();
+    
+    // User 1 creates a book
+    await agent1.post('/api/books').send({
+      ol_key: '/works/OL_USER1_BOOK',
+      title: 'User 1 Book'
+    });
+    
+    // User 2 creates a different book
+    await agent2.post('/api/books').send({
+      ol_key: '/works/OL_USER2_BOOK',
+      title: 'User 2 Book'
+    });
+    
+    // User 1 should only see their book
+    const res1 = await agent1.get('/api/books');
+    expect(res1.status).toBe(200);
+    expect(res1.body).toHaveLength(1);
+    expect(res1.body[0].title).toBe('User 1 Book');
+    
+    // User 2 should only see their book
+    const res2 = await agent2.get('/api/books');
+    expect(res2.status).toBe(200);
+    expect(res2.body).toHaveLength(1);
+    expect(res2.body[0].title).toBe('User 2 Book');
+  });
+
+  // Test Case 25c: User cannot access another user's book by ID
+  test('User cannot access another user\'s book by ID', async () => {
+    const agent1 = await createAuthenticatedAgent();
+    const agent2 = await createAuthenticatedAgent();
+    
+    // User 1 creates a book
+    const createRes = await agent1.post('/api/books').send({
+      ol_key: '/works/OL_PRIVATE',
+      title: 'Private Book'
+    });
+    const bookId = createRes.body._id;
+    
+    // User 2 tries to access User 1's book - should get 404
+    const res = await agent2.get(`/api/books/${bookId}`);
+    expect(res.status).toBe(404);
+  });
+
+  // Test Case 25d: User cannot update another user's book
+  test('User cannot update another user\'s book', async () => {
+    const agent1 = await createAuthenticatedAgent();
+    const agent2 = await createAuthenticatedAgent();
+    
+    // User 1 creates a book
+    const createRes = await agent1.post('/api/books').send({
+      ol_key: '/works/OL_PROTECTED',
+      title: 'Protected Book'
+    });
+    const bookId = createRes.body._id;
+    
+    // User 2 tries to update User 1's book - should get 404
+    const res = await agent2.put(`/api/books/${bookId}`).send({
+      title: 'Hacked Title'
+    });
+    expect(res.status).toBe(404);
+    
+    // Verify book is unchanged
+    const verifyRes = await agent1.get(`/api/books/${bookId}`);
+    expect(verifyRes.body.title).toBe('Protected Book');
+  });
+
+  // Test Case 25e: User cannot delete another user's book
+  test('User cannot delete another user\'s book', async () => {
+    const agent1 = await createAuthenticatedAgent();
+    const agent2 = await createAuthenticatedAgent();
+    
+    // User 1 creates a book
+    const createRes = await agent1.post('/api/books').send({
+      ol_key: '/works/OL_NODELETE',
+      title: 'Cannot Delete'
+    });
+    const bookId = createRes.body._id;
+    
+    // User 2 tries to delete User 1's book - should get 404
+    const res = await agent2.delete(`/api/books/${bookId}`);
+    expect(res.status).toBe(404);
+    
+    // Verify book still exists for User 1
+    const verifyRes = await agent1.get(`/api/books/${bookId}`);
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.title).toBe('Cannot Delete');
+  });
+});
+
+describe('Master Book List Initialization', () => {
+  beforeEach(() => {
+    users.clear();
+  });
+
+  // Test Case: New users get a copy of master books
+  test('New user should receive copy of master book list on first access', async () => {
+    // First, create some master books (userId: null)
+    const Book = (await import('../books/Book.js')).default;
+    await Book.create([
+      { ol_key: '/works/MASTER1', title: 'Master Book 1', author: 'Author 1', userId: null },
+      { ol_key: '/works/MASTER2', title: 'Master Book 2', author: 'Author 2', userId: null },
+    ]);
+    
+    // Create a new user and access their books
+    const agent = await createAuthenticatedAgent();
+    const res = await agent.get('/api/books');
+    
+    // User should have copies of the master books
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+    expect(res.body.map(b => b.title).sort()).toEqual(['Master Book 1', 'Master Book 2']);
+    
+    // User's books should have userId set (not null)
+    expect(res.body[0].userId).toBeDefined();
+    expect(res.body[0].userId).not.toBeNull();
+  });
+
+  // Test Case: User modifications don't affect master list
+  test('User modifications should not affect master book list', async () => {
+    const Book = (await import('../books/Book.js')).default;
+    await Book.create({ ol_key: '/works/MASTERMOD', title: 'Original Title', userId: null });
+    
+    // User gets their copy and modifies it
+    const agent = await createAuthenticatedAgent();
+    const booksRes = await agent.get('/api/books');
+    const userBookId = booksRes.body[0]._id;
+    
+    await agent.put(`/api/books/${userBookId}`).send({ title: 'Modified Title' });
+    
+    // Master book should be unchanged
+    const masterBook = await Book.findOne({ ol_key: '/works/MASTERMOD', userId: null });
+    expect(masterBook.title).toBe('Original Title');
+    
+    // User's book should be modified
+    const userRes = await agent.get(`/api/books/${userBookId}`);
+    expect(userRes.body.title).toBe('Modified Title');
+  });
+
+  // Test Case: User deletion doesn't affect master list
+  test('User deletion should not affect master book list', async () => {
+    const Book = (await import('../books/Book.js')).default;
+    await Book.create({ ol_key: '/works/MASTERDEL', title: 'Master Book', userId: null });
+    
+    // User gets their copy and deletes it
+    const agent = await createAuthenticatedAgent();
+    const booksRes = await agent.get('/api/books');
+    const userBookId = booksRes.body[0]._id;
+    
+    await agent.delete(`/api/books/${userBookId}`);
+    
+    // Master book should still exist
+    const masterBook = await Book.findOne({ ol_key: '/works/MASTERDEL', userId: null });
+    expect(masterBook).not.toBeNull();
+    expect(masterBook.title).toBe('Master Book');
+  });
+
+  // Test Case: User who deletes all books gets fresh copy on next access
+  test('User who deletes all books gets fresh copy from master on next access', async () => {
+    const Book = (await import('../books/Book.js')).default;
+    await Book.create({ ol_key: '/works/MASTERRESET', title: 'Reset Book', userId: null });
+    
+    // User gets their copy
+    const agent = await createAuthenticatedAgent();
+    const booksRes = await agent.get('/api/books');
+    expect(booksRes.body).toHaveLength(1);
+    const userBookId = booksRes.body[0]._id;
+    
+    // User deletes their book
+    await agent.delete(`/api/books/${userBookId}`);
+    
+    // On next access, user gets a fresh copy from master (reset behavior)
+    const resetRes = await agent.get('/api/books');
+    expect(resetRes.body).toHaveLength(1);
+    expect(resetRes.body[0].title).toBe('Reset Book');
+    // It's a new copy (different _id)
+    expect(resetRes.body[0]._id).not.toBe(userBookId);
+  });
 });
 
 describe('Books Import API', () => {
@@ -541,6 +724,35 @@ describe('Books Import API', () => {
 
     expect(res.status).toBe(401);
     expect(res.body.error).toBe('Unauthorized');
+  });
+
+  // Test Case 31b: Imports are user-scoped
+  test('POST /api/books/import should only add books to importing user', async () => {
+    const agent1 = await createAuthenticatedAgent();
+    const agent2 = await createAuthenticatedAgent();
+    
+    // User 1 imports some books
+    await agent1.post('/api/books/import').send({
+      docs: [
+        { key: '/works/IMPORT_USER1', title: 'User 1 Import' }
+      ]
+    });
+    
+    // User 2 imports different books
+    await agent2.post('/api/books/import').send({
+      docs: [
+        { key: '/works/IMPORT_USER2', title: 'User 2 Import' }
+      ]
+    });
+    
+    // Each user should only see their own imported books
+    const res1 = await agent1.get('/api/books');
+    expect(res1.body).toHaveLength(1);
+    expect(res1.body[0].title).toBe('User 1 Import');
+    
+    const res2 = await agent2.get('/api/books');
+    expect(res2.body).toHaveLength(1);
+    expect(res2.body[0].title).toBe('User 2 Import');
   });
 });
 
