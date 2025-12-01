@@ -28,6 +28,7 @@ body {
 /* App (books) page: align toward the top, especially on larger screens */
 .page-app {
   align-items: flex-start;
+  padding-top: 1.5rem;  /* gap between card and top of page */
 }
 
 /* Desktop tweaks for the app dashboard */
@@ -64,6 +65,7 @@ body {
 .card-wide {
   max-width: 1100px;
   text-align: left;        /* more natural for a dashboard */
+  transform: none;         /* remove upward shift for dashboard */
 }
 
 
