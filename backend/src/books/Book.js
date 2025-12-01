@@ -18,4 +18,12 @@ const bookSchema = new Schema(
 // Compound unique index: ol_key must be unique per user (including null for master)
 bookSchema.index({ ol_key: 1, userId: 1 }, { unique: true });
 
-export default model('Book', bookSchema);
+const Book = model('Book', bookSchema);
+
+// Drop the old ol_key_1 unique index if it exists (migration from old schema)
+// This runs once when the model is first used
+Book.collection.dropIndex('ol_key_1').catch(() => {
+  // Index doesn't exist or already dropped - this is fine
+});
+
+export default Book;
