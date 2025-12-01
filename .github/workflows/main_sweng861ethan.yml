@@ -29,6 +29,10 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test -- --ci --coverage
+
       - name: Build frontend
         working-directory: frontend
         run: npm run build
@@ -46,6 +50,12 @@ jobs:
         env:
           DATABASE_URL: file:./dev.db
         run: npx prisma generate
+
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          DATABASE_URL: file:./dev.db
+        run: npm test -- --ci --coverage
 
       # If you want to run migrations during CI build, uncomment:
       # - name: Prisma migrate deploy (CI)
