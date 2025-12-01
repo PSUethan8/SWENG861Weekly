@@ -827,4 +827,3 @@ describe('Validation Module', () => {
     expect(result).toEqual([]);
   });
 });
-
